@@ -96,6 +96,17 @@ def get_all_agents():
     return agents
 
 
+def delete_agent(agent_id: str) -> bool:
+    """删除指定 agent，返回是否有记录被移除"""
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute('DELETE FROM agents WHERE id = ?', (agent_id,))
+    affected = cursor.rowcount
+    conn.commit()
+    conn.close()
+    return affected > 0
+
+
 
 
 

@@ -1,6 +1,7 @@
 # app.py
 from flask import Flask, request, render_template, jsonify
-from DB.targetdb import init_db, register_agent, get_all_agents, init_listeners_table, get_all_listeners,add_listener
+from DB.targetdb import init_db, register_agent, init_listeners_table, get_all_listeners, add_listener
+from control.target import delete_agent_by_id, list_agents_for_display
 from datetime import datetime
 from typing import List, Dict, Optional
 
@@ -96,37 +97,16 @@ def api_register():
 # ======================
 @app.route('/')
 def index():
-    agents = get_all_agents()
+    agents = list_agents_for_display()
+    return render_template('index.html', agents=agents)
 
-    # 计算在线状态（5分钟内算在线）
-    agent_list = []
-    for a in agents:
-        last_seen = datetime.fromisoformat(a['last_seen'])
-        offline_seconds = (datetime.utcnow() - last_seen).total_seconds()
-        status = "online" if offline_seconds < 300 else "offline"
 
-        # 计算在线状态（5分钟内算在线）
-        try:
-            last_seen = datetime.fromisoformat(a['last_seen'])
-            offline_seconds = (datetime.utcnow() - last_seen).total_seconds()
-            status = "online" if offline_seconds < 300 else "offline"
-        except:
-            status = "unknown"
-
-        agent_list.append({
-            'id': a['id'],
-            'ip': a['ip_address'],
-            'hostname': a['hostname'],
-            'os': a['os'],
-            'who': a['who'],  # ✅ 添加
-            'arch': a['arch'],  # ✅ 添加
-            'process_name': a['process_name'],  # ✅ 添加
-            'first_seen': datetime.fromisoformat(a['first_seen']).strftime("%Y-%m-%d %H:%M:%S"),
-            'last_seen': datetime.fromisoformat(a['last_seen']).strftime("%Y-%m-%d %H:%M:%S"),
-            'status': status
-        })
-
-    return render_template('index.html', agents=agent_list)
+@app.route('/agents/<string:agent_id>', methods=['DELETE'])
+def api_delete_agent(agent_id: str):
+    deleted = delete_agent_by_id(agent_id)
+    if not deleted:
+        return jsonify({'error': 'Agent not found'}), 404
+    return jsonify({'success': True, 'agent_id': agent_id}), 200
 
 # ======================
 # 启动
