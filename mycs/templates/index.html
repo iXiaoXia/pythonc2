@@ -1,0 +1,174 @@
+<!-- templates/index.html -->
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TeamServer 控制面板</title>
+    <style>
+        /* ========== 全局样式 ========== */
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f5f7fa;
+            color: #333;
+        }
+
+        /* ========== 导航栏 ========== */
+        .navbar {
+            background-color: #2c3e50;
+            padding: 0;
+            margin: 0;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .nav-list {
+            list-style: none;
+            display: flex;
+            margin: 0;
+            padding: 0;
+        }
+
+        .nav-item {
+            margin: 0;
+        }
+
+        .nav-link {
+            display: block;
+            color: #ecf0f1;
+            text-decoration: none;
+            padding: 16px 24px;
+            font-weight: 600;
+            transition: background-color 0.2s;
+        }
+
+        .nav-link:hover {
+            background-color: #34495e;
+        }
+
+        .nav-link.active {
+            background-color: #3498db;
+            color: white;
+        }
+
+        /* ========== 主内容区 ========== */
+        .container {
+            max-width: 1200px;
+            margin: 24px auto;
+            padding: 0 20px;
+        }
+
+        h1 {
+            text-align: center;
+            color: #2c3e50;
+            margin-bottom: 24px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background: white;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+
+        th, td {
+            padding: 14px 16px;
+            text-align: left;
+            border-bottom: 1px solid #eee;
+        }
+
+        th {
+            background-color: #3498db;
+            color: white;
+        }
+
+        tr:hover {
+            background-color: #f9f9f9;
+        }
+
+        .online { color: green; font-weight: bold; }
+        .offline { color: red; }
+
+        .note {
+            background: #e7f3ff;
+            padding: 12px;
+            border-radius: 6px;
+            margin: 20px 0;
+            font-size: 14px;
+        }
+
+        .note code {
+            background: #d0e7ff;
+            padding: 2px 6px;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- ========== 导航横栏 ========== -->
+    <nav class="navbar">
+        <ul class="nav-list">
+            <li class="nav-item"><a href="/" class="nav-link active">客户端显示</a></li>
+            <li class="nav-item"><a href="/generate" class="nav-link">客户端生成</a></li>
+            <li class="nav-item"><a href="/listen" class="nav-link">Listen 设置</a></li>
+            <li class="nav-item"><a href="/custom" class="nav-link">自定义功能</a></li>
+            <li class="nav-item"><a href="/security" class="nav-link">安全设置</a></li>
+        </ul>
+    </nav>
+
+    <!-- ========== 主内容区 ========== -->
+    <div class="container">
+        <h1>🎯 上线主机列表</h1>
+
+        <div class="note">
+            💡 使用 curl 测试上线：<br>
+            <code>curl -X POST http://&lt;your-ip&gt;:5000/register -H "Content-Type: application/json" -d '{"id":"test001","hostname":"MyPC","os":"Windows 11","who":"user","arch":"x64","process_name":"beacon.exe"}'</code>
+        </div>
+
+        {% if agents %}
+        <table>
+            <!-- 表头 -->
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>IP 地址</th>
+                    <th>主机名</th>
+                    <th>操作系统</th>
+                    <th>用户</th>
+                    <th>架构</th>
+                    <th>进程</th>
+                    <!-- 移除“状态”列 -->
+                    <th>首次上线</th>
+                    <th>最后在线</th>
+                </tr>
+            </thead>
+
+            <!-- 表体 -->
+            <tbody>
+                {% for agent in agents %}
+                <tr>
+                    <td>{{ agent.id }}</td>
+                    <td>{{ agent.ip }}</td>
+                    <td>{{ agent.hostname }}</td>
+                    <td>{{ agent.os }}</td>
+                    <td>{{ agent.who }}</td>
+                    <td>{{ agent.arch }}</td>
+                    <td>{{ agent.process_name }}</td>
+                    <!-- 新增两列 -->
+                    <td>{{ agent.first_seen }}</td>
+                    <td>{{ agent.last_seen }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <p style="text-align:center; color:#7f8c8d;">暂无上线主机。</p>
+        {% endif %}
+    </div>
+
+</body>
+</html>

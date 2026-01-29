@@ -1,0 +1,267 @@
+<!-- templates/listen.html -->
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>📡 Listen 设置</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f7fa;
+        }
+        h1 {
+            color: #2c3e50;
+            text-align: center;
+        }
+        .actions {
+            text-align: right;
+            margin-bottom: 15px;
+        }
+        .btn {
+            padding: 8px 16px;
+            margin-left: 8px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        .btn-add { background-color: #2ecc71; color: white; }
+        .btn-edit { background-color: #3498db; color: white; font-size: 0.9em; }
+        .btn-delete { background-color: #e74c3c; color: white; font-size: 0.9em; }
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; background: white; box-shadow: 0 1px 3px rgba(0,0,0,0.1); border-radius: 6px; overflow: hidden; }
+        th, td { padding: 12px 15px; text-align: left; border-bottom: 1px solid #eee; }
+        th { background-color: #3498db; color: white; }
+        tr:hover { background-color: #f9f9f9; }
+        .status-running { color: green; font-weight: bold; }
+        .status-stopped { color: red; }
+        .note { background: #e7f3ff; padding: 12px; border-radius: 6px; margin: 20px 0; font-size: 14px; }
+        .config-item { margin-top: 4px; font-size: 0.9em; color: #555; }
+
+        /* Modal */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0; top: 0;
+            width: 100%; height: 100%;
+            background-color: rgba(0,0,0,0.5);
+        }
+        .modal-content {
+            background-color: white;
+            margin: 10% auto;
+            padding: 20px;
+            border-radius: 8px;
+            width: 90%;
+            max-width: 500px;
+        }
+        .close { float: right; cursor: pointer; font-size: 24px; }
+        .form-group { margin: 15px 0; }
+        label { display: block; margin-bottom: 5px; font-weight: bold; }
+        input, select { width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; }
+        .error { color: red; margin-top: 10px; }
+        .domain-field { display: none; } /* 默认隐藏 */
+    </style>
+</head>
+<body>
+    <h1>📡 监听器管理</h1>
+
+    <div class="note">
+        💡 支持类型：HTTP / HTTPS（可自定义域名和路径），其他类型后续支持。
+    </div>
+
+    <div class="actions">
+        <button class="btn btn-add" onclick="openAddModal()">➕ 新增监听器</button>
+    </div>
+
+    {% if listeners %}
+    <table>
+        <thead>
+            <tr>
+                <th>名称</th>
+                <th>类型</th>
+                <th>端口</th>
+                <th>状态</th>
+                <th>配置详情</th>
+                <th>操作</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for l in listeners %}
+            <tr>
+                <td>{{ l.name }}</td>
+                <td>{{ l.listener_type.upper() }}</td> <!-- ✅ 使用 listener_type -->
+                <td>{{ l.port }}</td>
+                <td>
+                    {% if l.is_running %}
+                        <span class="status-running">运行中</span>
+                    {% else %}
+                        <span class="status-stopped">已停止</span>
+                    {% endif %}
+                </td>
+                <td>
+                    {% if l.listener_type == 'https' %} <!-- ✅ 使用 listener_type -->
+                        <div class="config-item"><strong>域名:</strong> {{ l.domain or '未设置' }}</div>
+                        <div class="config-item"><strong>路径:</strong> {{ l.url_path or '/' }}</div>
+                    {% elif l.listener_type == 'http' %} <!-- ✅ 使用 listener_type -->
+                        <div class="config-item"><strong>路径:</strong> {{ l.url_path or '/' }}</div>
+                    {% else %}
+                        <em>暂不支持详细配置（{{ l.listener_type }}）</em>
+                    {% endif %}
+                </td>
+                <td>
+                    <button class="btn btn-edit" onclick="openEditModal('{{ l.name|tojson|safe }}', {{ l|tojson|safe }})">✏️ 编辑</button>
+                    <button class="btn btn-delete" onclick="deleteListener('{{ l.name }}')">🗑️ 删除</button>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <p style="text-align:center; color:#7f8c8d;">暂无监听器。</p>
+    {% endif %}
+
+    <!-- Modal 表单 -->
+    <div id="listenerModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeModal()">&times;</span>
+            <h3 id="modalTitle">新增监听器</h3>
+            <form id="listenerForm">
+                <input type="hidden" id="editName" value="">
+                <div class="form-group">
+                    <label>名称:</label>
+                    <input type="text" id="name" required>
+                </div>
+                <div class="form-group">
+                    <label>类型:</label>
+                    <select id="type" onchange="toggleDomainField()">
+                        <option value="http">HTTP</option>
+                        <option value="https">HTTPS</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>端口:</label>
+                    <input type="number" id="port" min="1" max="65535" value="8080" required>
+                </div>
+                <div class="form-group domain-field" id="domainField">
+                    <label>域名 (HTTPS):</label>
+                    <input type="text" id="domain" placeholder="例如: beacon.example.com">
+                </div>
+                <div class="form-group">
+                    <label>URL 路径:</label>
+                    <input type="text" id="url_path" value="/" placeholder="/checkin">
+                </div>
+                <button type="submit" class="btn btn-add">保存</button>
+                <div class="error" id="errorMessage"></div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        function toggleDomainField() {
+            const type = document.getElementById('type').value;
+            const domainField = document.getElementById('domainField');
+            domainField.style.display = (type === 'https') ? 'block' : 'none';
+        }
+
+        function openAddModal() {
+            document.getElementById('modalTitle').textContent = '新增监听器';
+            document.getElementById('editName').value = '';
+            document.getElementById('listenerForm').reset();
+            document.getElementById('type').value = 'http';
+            toggleDomainField();
+            document.getElementById('errorMessage').textContent = '';
+            document.getElementById('listenerModal').style.display = 'block';
+        }
+
+        function openEditModal(name, data) {
+            document.getElementById('modalTitle').textContent = '编辑监听器: ' + name;
+            document.getElementById('editName').value = name;
+            document.getElementById('name').value = data.name;
+            // ✅ 关键：从 data.listener_type 获取值
+            document.getElementById('type').value = data.listener_type;
+            document.getElementById('port').value = data.port;
+            document.getElementById('url_path').value = data.url_path || '/';
+            if (data.listener_type === 'https') {
+                document.getElementById('domain').value = data.domain || '';
+            }
+            toggleDomainField();
+            document.getElementById('errorMessage').textContent = '';
+            document.getElementById('listenerModal').style.display = 'block';
+        }
+
+        function closeModal() {
+            document.getElementById('listenerModal').style.display = 'none';
+        }
+
+        document.getElementById('listenerForm').onsubmit = async function(e) {
+            e.preventDefault();
+            const editName = document.getElementById('editName').value;
+            const isEdit = !!editName;
+
+            const data = {
+                name: document.getElementById('name').value.trim(),
+                type: document.getElementById('type').value, // API 仍用 type（简洁）
+                port: parseInt(document.getElementById('port').value),
+                url_path: document.getElementById('url_path').value.trim() || '/'
+            };
+            if (data.type === 'https') {
+                data.domain = document.getElementById('domain').value.trim();
+            }
+
+            document.getElementById('errorMessage').textContent = '';
+
+            let url, method;
+            if (isEdit) {
+                url = `/listen/update/ $ {encodeURIComponent(editName)}`;
+                method = 'POST';
+            } else {
+                url = '/listen/add';
+                method = 'POST';
+            }
+
+            try {
+                const res = await fetch(url, {
+                    method: method,
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+                const result = await res.json();
+
+                if (result.success) {
+                    location.reload();
+                } else {
+                    document.getElementById('errorMessage').textContent = result.error || '操作失败';
+                }
+            } catch (err) {
+                document.getElementById('errorMessage').textContent = '网络错误: ' + err.message;
+            }
+        };
+
+        async function deleteListener(name) {
+            if (!confirm(`确定要删除监听器 " $ {name}" 吗？`)) return;
+
+            try {
+                const res = await fetch(`/listen/delete/ $ {encodeURIComponent(name)}`, {
+                    method: 'POST'
+                });
+                if (res.ok) {
+                    location.reload();
+                } else {
+                    alert('删除失败');
+                }
+            } catch (err) {
+                alert('网络错误: ' + err.message);
+            }
+        }
+
+        window.onclick = function(event) {
+            const modal = document.getElementById('listenerModal');
+            if (event.target === modal) {
+                closeModal();
+            }
+        }
+    </script>
+</body>
+</html>
